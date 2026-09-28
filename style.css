@@ -1,0 +1,59 @@
+:root { --bg: #0f1216; --panel: #171b21; --line: #2a3039; --text: #e6e9ee; --dim: #9aa4b2; --acc: #4f9dff; --pos: #ff8a4c; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+a { color: var(--acc); }
+h1 { margin: 0 0 8px; font-size: 28px; }
+h1 span { color: var(--dim); font-weight: 400; }
+header p { margin: 6px 0; color: var(--dim); }
+.notice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 4px; }
+.notice > div { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid #f0c36a; border-radius: 8px; padding: 10px 14px; }
+.notice > div:nth-child(2) { border-left-color: #5fc98a; }
+.notice > .specs { grid-column: 1 / -1; border-left-color: #6aa8f0; }
+.notice ul { margin: 0; padding-left: 18px; color: var(--dim); font-size: 13.5px; }
+.notice h2 { margin: 0 0 4px; font-size: 15px; }
+.notice p { margin: 0; color: var(--dim); font-size: 13.5px; }
+@media (max-width: 700px) { .notice { grid-template-columns: 1fr; } }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 18px 0 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg label { padding: 6px 14px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg label:last-child { border-right: 0; }
+.seg input { display: none; }
+.seg label:has(input:checked) { background: var(--acc); color: #fff; }
+.caps { color: var(--dim); font-size: 13px; }
+.drop { border: 2px dashed var(--line); border-radius: 12px; padding: 22px; background: var(--panel); text-align: center; transition: border-color .15s; }
+.drop.over { border-color: var(--acc); }
+.drop.busy { opacity: .5; pointer-events: none; }
+.drop p { margin: 4px 0; }
+.hint { color: var(--dim); font-size: 13px; }
+.buttons { margin-top: 12px; display: flex; gap: 10px; justify-content: center; }
+.btn { display: inline-block; padding: 7px 14px; border-radius: 8px; background: #25303d; border: 1px solid var(--line); color: var(--text); cursor: pointer; font: inherit; }
+.btn:hover { background: #2e3a49; }
+.btn input { display: none; }
+.btn.small { padding: 3px 10px; font-size: 13px; }
+.status { margin: 16px 0; }
+.stage { display: flex; justify-content: space-between; color: var(--dim); font-size: 14px; margin-bottom: 4px; }
+.bar { height: 8px; background: var(--panel); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--acc); transition: width .2s; }
+.summary { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 14px; color: var(--dim); }
+.summary b { color: var(--text); font-weight: 600; }
+details { margin-top: 22px; }
+summary { cursor: pointer; color: var(--dim); }
+pre { background: #0a0c0f; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; }
+footer { margin-top: 28px; color: var(--dim); font-size: 13px; }
+.controls .seg + .seg { margin-left: 4px; }
+#chat { margin-top: 18px; }
+#msgs { margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+.msg { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; white-space: pre-wrap; font-size: 14.5px; }
+.msg.user { background: #1b2430; align-self: flex-end; max-width: 85%; }
+.msg.bot { background: var(--panel); }
+.msg .think { color: var(--dim); font-size: 13px; border-left: 2px solid var(--line); padding-left: 10px; margin-bottom: 8px; }
+.msg .answer { color: #ffd08a; font-weight: 600; }
+.msg .meta { color: var(--dim); font-size: 12px; margin-top: 6px; white-space: normal; }
+.msg.working .body::after { content: '▍'; color: var(--acc); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+#askForm textarea { width: 100%; background: #0a0c0f; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; resize: vertical; }
+.askbar { display: flex; gap: 10px; align-items: center; margin-top: 6px; font-size: 14px; }
+.askbar .grow { flex: 1; }
+.btn:disabled { opacity: .45; cursor: default; }

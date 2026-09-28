@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NV-Reason-CT in the browser: CT reports and questions</title>
+<script src="coi-serviceworker.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>NV-Reason-CT <span>in the browser</span></h1>
+    <p>Runs <a href="https://huggingface.co/nvidia/NV-Reason-CT">NV-Reason-CT</a> from NVIDIA, a 3D CT vision-language model,
+      to write structured chest or abdominal CT reports and answer questions about the scan.</p>
+  </header>
+
+  <section class="notice" aria-label="Disclaimer">
+    <div>
+      <h2>Research use only</h2>
+      <p>This is a research demonstration and is not a medical device. It has not been validated or approved for clinical use,
+        and it must not be used for diagnosis, treatment or any other clinical decision. The model can miss findings and can
+        describe findings that are not there. The weights are compressed to 8-bit or 4-bit to fit in the browser. The 8-bit build closely
+        matches the original model; the 4-bit build is smaller but its reports can differ more.</p>
+    </div>
+    <div>
+      <h2>Your images stay on this computer</h2>
+      <p>Files you choose are read and processed inside this browser tab, using your GPU. No image data, questions or answers are uploaded anywhere.
+        The only downloads are this page and the model files (5.0 GB for the 8-bit build or 3.0 GB for the 4-bit build, from <a href="https://huggingface.co/jarrelscy/nv-reason-ct-onnx">Hugging Face</a>),
+        which are fetched once and cached in the browser. After the first visit the page also works with the internet turned off.</p>
+    </div>
+    <div class="specs">
+      <h2>What you need</h2>
+      <ul>
+        <li><b>Browser:</b> a recent desktop Chrome or Edge with WebGPU. Firefox and Safari are untested. Phones and tablets are not supported.</li>
+        <li><b>GPU:</b> a desktop or laptop GPU with at least 8 GB of memory for the 8-bit build (12 GB or more recommended), or 6 GB for the 4-bit build.
+          Integrated graphics with shared memory may work but will be slow.</li>
+        <li><b>Memory:</b> 16 GB RAM minimum. The tab peaks at about 6 GB while the models are loaded.</li>
+        <li><b>Storage and network:</b> 6 GB of free disk for the browser cache (3.5 GB for the 4-bit build), and an internet connection for the first visit only.</li>
+        <li><b>Time:</b> on a desktop GPU, loading a scan and writing a report takes about a minute or two; follow-up questions are quicker.
+          A CPU fallback exists but takes a very long time.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="controls">
+    <div class="seg" role="radiogroup" aria-label="Region">
+      <label><input type="radio" name="region" value="chest" checked> Chest</label>
+      <label><input type="radio" name="region" value="abdomen"> Abdomen</label>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Model build">
+      <label title="Closely matches the original model. 5.0 GB download."><input type="radio" name="variant" value="int8" checked> 8-bit · 5.0 GB</label>
+      <label title="Smaller and a little faster; reports can differ more from the original model. 3.0 GB download."><input type="radio" name="variant" value="int4"> 4-bit · 3.0 GB</label>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Compute device">
+      <label><input type="radio" name="device" value="auto" checked> Auto</label>
+      <label><input type="radio" name="device" value="webgpu"> WebGPU</label>
+      <label><input type="radio" name="device" value="wasm"> CPU</label>
+    </div>
+    <div id="caps" class="caps"></div>
+    <button id="clearCache" class="btn small" type="button" title="Delete the downloaded model files from this browser">Remove cached models</button>
+  </section>
+
+  <section id="drop" class="drop" tabindex="0">
+    <p><b>Drop a CT here</b>: a zip of a DICOM study, a DICOM folder, loose DICOM files, or a .nii / .nii.gz volume.</p>
+    <p class="hint">The volume is resampled to 2 mm and a 38 cm cube is cropped around the chest or abdomen, placed using the lungs.
+      From a study, the largest axial CT series whose description matches the chosen region is used; otherwise the largest CT series.</p>
+    <div class="buttons">
+      <label class="btn">Choose file(s)<input id="files" type="file" multiple accept=".zip,.nii,.gz,.dcm,application/zip,application/dicom,*/*"></label>
+      <label class="btn">Choose folder<input id="folder" type="file" webkitdirectory></label>
+    </div>
+  </section>
+
+  <section id="status" class="status" hidden>
+    <div class="stage"><span id="stage">Starting</span><span id="pct"></span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </section>
+
+  <section id="chat" hidden>
+    <div class="summary" id="summary"></div>
+    <div id="msgs"></div>
+    <div class="presets" id="presets"></div>
+    <form id="askForm">
+      <textarea id="q" rows="2" placeholder="Ask a question about this scan, e.g. Is there a pleural effusion?"></textarea>
+      <div class="askbar">
+        <label title="The model writes its reasoning before the answer. Slower."><input type="checkbox" id="thinking"> Show reasoning</label>
+        <span class="grow"></span>
+        <button type="button" id="newChat" class="btn small">New conversation</button>
+        <button type="button" id="stop" class="btn small" disabled>Stop</button>
+        <button type="submit" id="send" class="btn">Ask</button>
+      </div>
+    </form>
+  </section>
+
+  <details id="logbox" open>
+    <summary>Log</summary>
+    <pre id="log"></pre>
+  </details>
+
+  <footer>
+    <p>Research use only. Not a medical device. Images are processed locally and never uploaded.</p>
+    <p>Model: NV-Reason-CT by NVIDIA, <a href="https://huggingface.co/nvidia/NV-Reason-CT/blob/main/LICENSE">OpenMDW License</a>.
+      Converted to ONNX, quantised to 8-bit and 4-bit (GPTQ) and run with <a href="https://onnxruntime.ai/">ONNX Runtime Web</a>.
+      <a href="https://github.com/jarrelscy/nv-reason-ct-web">Source</a>.</p>
+    <p>Site built entirely by <a href="https://claude.com/claude-code">Claude Opus 5.5</a> in Claude Code.</p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

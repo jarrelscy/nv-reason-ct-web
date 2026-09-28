@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>NV-Reason-CT end to end</title>
+<script src="../coi-serviceworker.js"></script>
+<pre id="out"></pre>
+<script type="module">
+// Loads models/<dir> (package.py output), runs vision on a preprocessed crop and asks for a report.
+//   ?dir=hub&dec=int8&crop=crop.bin&q=Write a structured abdomen CT report.&max=400&device=webgpu&ref=ref.json
+// With ?ref=, compares the generated tokens with the reference greedy run.
+import * as ort from '../vendor/ort/ort.webgpu.min.mjs';
+import { loadNV } from '../lib/nvreason.js';
+ort.env.wasm.wasmPaths = new URL('../vendor/ort/', location.href).href;
+ort.env.wasm.numThreads = crossOriginIsolated ? 16 : 1;
+ort.env.logLevel = 'error';
+const q = new URLSearchParams(location.search);
+const dir = new URL(`../models/${q.get('dir') || 'hub'}/`, location.href).href;
+const out = document.getElementById('out');
+const t0 = performance.now();
+const log = s => { const m = `[${((performance.now() - t0) / 1000).toFixed(1)}s] ${s}`; out.textContent += m + '\n'; console.log(m); };
+// Files go through the Cache API like worker.js does, so they come back as disk-backed blobs.
+const cache = await caches.open('e2e-test');
+const blob = async n => {
+  const url = dir + n;
+  if (!await cache.match(url)) { const r = await fetch(url); if (!r.ok) throw new Error(`${n}: ${r.status}`); await cache.put(url, r); log(`cached ${n}`); }
+  return (await cache.match(url)).blob();
+};
+const part = async (name, sub = '') => {
+  const man = await (await fetch(dir + sub + name + '.json')).json();
+  const blobs = {};
+  for (const n of [man.onnx, ...man.data.map(d => d.name)]) blobs[n] = await blob(sub + n);
+  return { man, blobs };
+};
+if (!crossOriginIsolated) await new Promise(() => {}); // coi-serviceworker reloads the page
+try {
+  const files = { vision: await part('vision'), decoder: await part('decoder', (q.get('dec') || 'int4') + '/'), tokenizer: await blob('tokenizer.json'), tokenizerConfig: await blob('tokenizer_config.json') };
+  log('files fetched');
+  const nv = await loadNV(ort, { files, device: q.get('device') || 'webgpu', log });
+  const img = new Float32Array(await (await blob(q.get('crop') || 'crop.bin')).arrayBuffer());
+  await nv.setVolume(img);
+  let last = 0;
+  const reply = await nv.ask(q.get('q') || 'Write a structured abdomen CT report.', {
+    max: +(q.get('max') || 400), thinking: q.get('think') === '1',
+    onText: t => { if (t.length - last > 200) { last = t.length; log(`... ${t.length} chars`); } },
+    progress: f => log(`prefill ${(f * 100).toFixed(0)}%`),
+  });
+  log('REPLY:\n' + reply);
+  if (q.get('ref')) {
+    const ref = (await (await fetch(dir + q.get('ref'))).json()).runs[0].tokens, got = nv.lastTokens;
+    let k = 0; while (k < Math.min(ref.length, got.length) && ref[k] === got[k]) k++;
+    log(`matches reference for the first ${k} of ${ref.length} tokens (got ${got.length})`);
+  }
+  if (q.get('q2')) log('REPLY 2:\n' + await nv.ask(q.get('q2'), { max: 200 }));
+} catch (e) { log('FAILED: ' + (e.stack || e.message)); }
+log('DONE');
+</script>

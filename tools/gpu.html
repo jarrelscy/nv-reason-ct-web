@@ -1,0 +1,6 @@
+<!doctype html><script type="module">
+const a = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' });
+console.log('adapter', JSON.stringify(a?.info && { vendor: a.info.vendor, arch: a.info.architecture, desc: a.info.description, device: a.info.device }), 'features', [...(a?.features || [])].join(','));
+console.log('limits maxBuffer', a?.limits.maxBufferSize / 2 ** 20, 'maxStorageBinding', a?.limits.maxStorageBufferBindingSize / 2 ** 20);
+console.log('DONE');
+</script>

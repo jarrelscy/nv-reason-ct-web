@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Decoder: WebGPU vs CPU</title>
+<script src="../coi-serviceworker.js"></script>
+<pre id="out"></pre>
+<script type="module">
+// Runs a decoder prefill of ?s tokens then one decode step on WebGPU and wasm with the same random input.
+// ?model=dec-tiny picks models/<model>/model.onnx; ?cpu=0 skips wasm.
+import * as ort from '../vendor/ort/ort.webgpu.min.mjs';
+ort.env.wasm.wasmPaths = new URL('../vendor/ort/', location.href).href;
+ort.env.wasm.numThreads = crossOriginIsolated ? 16 : 1;
+const q = new URLSearchParams(location.search);
+const model = q.get('model') || 'dec-tiny', F32 = q.get('f32') === '1', DT = F32 ? 'float32' : 'float16', A = F32 ? Float32Array : Uint16Array, cv = F32 ? (x => x) : null, S = +(q.get('s') || 16), cpu = q.get('cpu') !== '0';
+const out = document.getElementById('out');
+const log = s => { out.textContent += s + '\n'; console.log('[dec] ' + s); };
+const base = new URL(`../models/${model}/`, location.href).href;
+const t0 = performance.now();
+const data = new Uint8Array(await (await fetch(base + 'model.onnx.data')).arrayBuffer());
+log(`fetched ${(data.length / 1e6).toFixed(0)} MB in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+const f16 = x => { const f = new Float32Array([x]), i = new Int32Array(f.buffer)[0]; const s = (i >>> 16) & 0x8000, e = ((i >>> 23) & 0xff) - 112, m = (i >>> 13) & 0x3ff; return e <= 0 ? s : e >= 31 ? s | 0x7c00 : s | (e << 10) | m; };
+const h2f = h => { const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 31, m = h & 1023; return e === 0 ? s * m * 2 ** -24 : e === 31 ? (m ? NaN : s * Infinity) : s * (1 + m / 1024) * 2 ** (e - 15); };
+let seed = 1; const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 2 ** 32 - 0.5; };
+async function run(ep) {
+  const s = await ort.InferenceSession.create(base + 'model.onnx', { executionProviders: [ep], externalData: [{ path: 'model.onnx.data', data }], logSeverityLevel: +(q.get('sev') ?? 2), logVerbosityLevel: 0 });
+  const feeds = {}, dims = {};
+  for (const [i, name] of s.inputNames.entries()) dims[name] = s.inputMetadata[i]?.shape;
+  const past = (L) => {
+    const f = {};
+    for (const name of s.inputNames) {
+      if (name.startsWith('past_key_values')) f[name] = new ort.Tensor(DT, new A(0), [1, 4, 0, 256]);
+      else if (name.endsWith('.conv')) f[name] = new ort.Tensor(DT, new A(8192 * 3), [1, 8192, 3]);
+      else if (name.endsWith('.recurrent')) f[name] = new ort.Tensor(DT, new A(32 * 128 * 128), [1, 32, 128, 128]);
+    }
+    return f;
+  };
+  const step = (n, p0, prev) => {
+    seed = 7 + p0;
+    const f = prev || past();
+    f.inputs_embeds = new ort.Tensor(DT, A.from({ length: n * 2560 }, () => F32 ? rnd() * 0.1 : f16(rnd() * 0.1)), [1, n, 2560]);
+    f.attention_mask = new ort.Tensor('int64', new BigInt64Array(p0 + n).fill(1n), [1, p0 + n]);
+    const pos = new BigInt64Array(3 * n); for (let c = 0; c < 3; c++) for (let i = 0; i < n; i++) pos[c * n + i] = BigInt(p0 + i);
+    f.position_ids = new ort.Tensor('int64', pos, [3, 1, n]);
+    return f;
+  };
+  const res = [];
+  let t = performance.now();
+  const o1 = await s.run(step(S, 0));
+  res.push(Array.from((await o1.logits.getData()).slice(0, 4096), F32 ? Number : h2f)); log(`${ep} prefill ${S}: ${(performance.now() - t).toFixed(0)} ms`);
+  const next = {};
+  for (const k of s.inputNames) if (k.startsWith('past')) next[k] = o1[k.replace('past_key_values', 'present').replace('past.', 'present.')];
+  t = performance.now();
+  const o2 = await s.run(step(1, S, next));
+  res.push(Array.from((await o2.logits.getData()).slice(0, 4096), F32 ? Number : h2f)); log(`${ep} decode: ${(performance.now() - t).toFixed(0)} ms`);
+  await s.release();
+  return res;
+}
+const R = {};
+for (const ep of cpu ? ['webgpu', 'wasm'] : ['webgpu']) {
+  try { R[ep] = await run(ep); } catch (e) { log(`${ep} FAILED: ${e.message}`); }
+}
+if (R.webgpu && R.wasm) for (const i of [0, 1]) {
+  const a = R.webgpu[i], b = R.wasm[i]; let m = 0, s = 0;
+  for (let j = 0; j < a.length; j++) { m = Math.max(m, Math.abs(a[j] - b[j])); s += Math.abs(b[j]); }
+  log(`step ${i}: max|webgpu - wasm| ${m.toFixed(4)}, mean|wasm| ${(s / a.length).toFixed(4)}`);
+}
+window.__R = R;
+log('DONE');
+</script>
