@@ -22,7 +22,7 @@ Choose Chest or Abdomen before loading the scan. From a study, the largest axial
 - 16 GB RAM; the tab peaks at about 6 GB while the models load.
 - 6 GB of browser storage for the 8-bit build (3.5 GB for 4-bit). Internet is needed on the first visit only.
 
-On an RTX PRO 6000 (Linux, Vulkan, no shader-f16) the vision encoder takes 4 s, reading the 13,845-token prompt takes 22–26 s, and generation runs at 21–25 tokens/s, so a report takes about 40 s with the 8-bit build. The 4-bit build reads the prompt in 15 s and generates at about 50 tokens/s. Follow-up questions reuse the cached prompt state and start straight away.
+On an RTX PRO 6000 (Linux, Vulkan, no shader-f16) the vision encoder takes 2 s, reading the 13,845-token prompt takes about 15 s, and generation runs at 45–50 tokens/s with either build, so a report takes about 25 s once the models are cached. Follow-up questions reuse the cached prompt state and start straight away.
 
 ## How it works
 
