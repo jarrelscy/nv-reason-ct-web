@@ -16,7 +16,7 @@ ort.env.logLevel = 'error';
 
 // Model files are on Hugging Face, pinned to one commit so the browser cache never mixes versions.
 // ?models=URL (relative to the page) overrides this for local testing.
-const MODELS = new URL(self.location.href).searchParams.get('models') || 'https://huggingface.co/jarrelscy/nv-reason-ct-onnx/resolve/COMMIT/';
+const MODELS = new URL(self.location.href).searchParams.get('models') || 'https://huggingface.co/jarrelscy/nv-reason-ct-onnx/resolve/83b49f5557298933f71bc0db9c8cbc20653c6032/';
 const CACHE = 'nv-reason-ct-models';
 const post = (type, x = {}) => self.postMessage({ type, ...x });
 const log = msg => post('log', { msg });
