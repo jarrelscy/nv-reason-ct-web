@@ -1,5 +1,5 @@
 // Runs NV-Reason-CT off the main thread.
-// Messages in: {preload, device, variant} | {files, device, variant, region} | {ask, thinking, max} | {stop} | {newChat} | {clearCache}.
+// Messages in: {preload, variant} | {files, variant, region} | {ask, thinking, max} | {stop} | {newChat} | {clearCache}.
 // variant is the decoder build: 'int8' (full accuracy) or 'int4' (smaller).
 // Messages out: {type:'log'|'progress'|'ready'|'volume'|'text'|'reply'|'error', ...}.
 import * as ort from './vendor/ort/ort.webgpu.min.mjs';
@@ -91,17 +91,15 @@ function getNV(device, variant) {
   return p;
 }
 
-async function pickDevice(want) {
-  if (want === 'wasm') return 'wasm';
+// WebGPU only: on the CPU a report would take hours.
+async function pickDevice() {
   const gpu = self.navigator.gpu && await self.navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
   if (gpu) {
     const l = gpu.limits;
     log(`WebGPU adapter: maxBufferSize ${(l.maxBufferSize / 1e6).toFixed(0)} MB, maxStorageBufferBindingSize ${(l.maxStorageBufferBindingSize / 1e6).toFixed(0)} MB`);
     return 'webgpu';
   }
-  if (want === 'webgpu') throw new Error('WebGPU is not available in this browser');
-  log('WebGPU not available; using CPU (this will be very slow)');
-  return 'wasm';
+  throw new Error('WebGPU is not available in this browser. Use a recent desktop Chrome or Edge');
 }
 
 let stop = false, busy = Promise.resolve();
@@ -126,13 +124,13 @@ async function handle(data) {
     if (data.preload) {
       try {
         stage('Loading models', 0);
-        await getNV(await pickDevice(data.device), data.variant);
+        await getNV(await pickDevice(), data.variant);
       } catch (e) { log(`model load failed (${e.message}); will retry when a scan is loaded`); }
       post('ready');
       return;
     }
     if (data.files) {
-      const device = await pickDevice(data.device);
+      const device = await pickDevice();
       const modelsReady = getNV(device, data.variant).catch(e => e);
       stage('Reading input', 0);
       const inp = await openInput(data.files, log);
@@ -149,7 +147,7 @@ async function handle(data) {
       stage('Loading models', 0);
       const R = await modelsReady;
       if (R instanceof Error) throw R;
-      stage(`Encoding the volume (${R.device === 'webgpu' ? 'WebGPU' : 'CPU'})`, 0);
+      stage('Encoding the volume', 0);
       await R.setVolume(img);
       log(`volume ready in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
       post('volume', { info, device: R.device });

@@ -38,7 +38,7 @@
         <li><b>Memory:</b> 16 GB RAM minimum. The tab peaks at about 6 GB while the models are loaded.</li>
         <li><b>Storage and network:</b> 6 GB of free disk for the browser cache (3.5 GB for the 4-bit build), and an internet connection for the first visit only.</li>
         <li><b>Time:</b> on a desktop GPU, loading a scan and writing a report takes about a minute or two; follow-up questions are quicker.
-          A CPU fallback exists but takes a very long time.</li>
+          There is no CPU mode: without WebGPU the model would take hours per report.</li>
       </ul>
     </div>
   </section>
@@ -51,11 +51,6 @@
     <div class="seg" role="radiogroup" aria-label="Model build">
       <label title="Closely matches the original model. 5.0 GB download."><input type="radio" name="variant" value="int8" checked> 8-bit · 5.0 GB</label>
       <label title="Smaller download; reports can differ more from the original model. 3.0 GB download."><input type="radio" name="variant" value="int4"> 4-bit · 3.0 GB</label>
-    </div>
-    <div class="seg" role="radiogroup" aria-label="Compute device">
-      <label><input type="radio" name="device" value="auto" checked> Auto</label>
-      <label><input type="radio" name="device" value="webgpu"> WebGPU</label>
-      <label><input type="radio" name="device" value="wasm"> CPU</label>
     </div>
     <div id="caps" class="caps"></div>
     <button id="clearCache" class="btn small" type="button" title="Delete the downloaded model files from this browser">Remove cached models</button>

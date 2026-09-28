@@ -22,7 +22,6 @@ function log(msg) {
   $('caps').textContent = bits.join(' · ');
 })();
 
-const device = () => document.querySelector('input[name=device]:checked').value;
 const variant = () => document.querySelector('input[name=variant]:checked').value;
 const region = () => document.querySelector('input[name=region]:checked').value;
 
@@ -38,9 +37,9 @@ worker.onerror = e => { log(`worker error: ${e.message}`); done(); };
 busy = true; runStart = performance.now();
 $('status').hidden = false; setStage('Loading models', 0);
 log('loading models');
-const preload = () => { if (asking) return; busy = true; runStart = performance.now(); $('status').hidden = false; setStage('Loading models', 0); volume = null; $('chat').hidden = true; worker.postMessage({ preload: true, device: device(), variant: variant() }); };
-worker.postMessage({ preload: true, device: device(), variant: variant() });
-document.querySelectorAll('input[name=device], input[name=variant]').forEach(el => el.addEventListener('change', () => { log(`switching to ${variant()} on ${device()}; load the scan again afterwards`); preload(); }));
+const preload = () => { if (asking) return; busy = true; runStart = performance.now(); $('status').hidden = false; setStage('Loading models', 0); volume = null; $('chat').hidden = true; worker.postMessage({ preload: true, variant: variant() }); };
+worker.postMessage({ preload: true, variant: variant() });
+document.querySelectorAll('input[name=variant]').forEach(el => el.addEventListener('change', () => { log(`switching to ${variant()}; load the scan again afterwards`); preload(); }));
 $('clearCache').onclick = () => { if (!asking && confirm('Delete the downloaded model files from this browser? They will be downloaded again next time.')) { busy = true; volume = null; $('chat').hidden = true; worker.postMessage({ clearCache: true }); } };
 
 function presets() {
@@ -68,7 +67,7 @@ function run(files) {
   log('---- new scan');
   setStage('Starting', 0);
   log(`${files.length} file(s): ${files.slice(0, 3).map(f => f.webkitRelativePath || f.name).join(', ')}${files.length > 3 ? ', …' : ''}; region ${region()}`);
-  worker.postMessage({ files, device: device(), variant: variant(), region: region() });
+  worker.postMessage({ files, variant: variant(), region: region() });
 }
 
 function ask(q, thinking) {
@@ -137,7 +136,7 @@ function onMessage({ data }) {
     volume = data;
     const i = data.info, sum = [];
     if (i.series_description !== undefined) sum.push(`Series <b>${esc(i.series_description || '?')}</b>${i.body_part ? ` [${esc(i.body_part)}]` : ''} (${esc(i.series_selection)})`);
-    sum.push(`${i.size.join('×')} voxels at ${i.spacing_mm.join(' × ')} mm`, `<b>${esc(i.region)}</b> crop`, data.device === 'webgpu' ? 'WebGPU' : 'CPU', 'research use only, not for clinical decisions');
+    sum.push(`${i.size.join('×')} voxels at ${i.spacing_mm.join(' × ')} mm`, `<b>${esc(i.region)}</b> crop`, 'research use only, not for clinical decisions');
     $('summary').innerHTML = sum.join(' · ');
     $('chat').hidden = false; presets();
     setStage(`Scan ready in ${((performance.now() - runStart) / 1000).toFixed(0)}s. Pick a prompt or ask a question.`, 1);
